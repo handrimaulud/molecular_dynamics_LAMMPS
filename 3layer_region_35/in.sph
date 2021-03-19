@@ -1,0 +1,71 @@
+atom_style         meso
+dimension          3
+newton             on
+boundary           p s p
+units              si
+
+# one centimeters side length
+variable sc equal 0.01 
+lattice sc ${sc} 
+ 
+region simbox block 0 500 0 200 0 200
+create_box 2 simbox
+
+region base block 0 500 0 1 0 200                           #base
+region bar1 block EDGE EDGE 3 5 EDGE EDGE                  #air 
+
+create_atoms 1 region base
+create_atoms 2 region bar1
+
+## density of water and speed of sound in water
+variable r equal 1000
+variable c equal 10
+variable v equal ${sc}*${sc}*${sc}    ## 0.001
+variable h equal ${sc}*3.0            ## 0.03
+variable m equal ${r}*${v}            ## 1
+
+mass 1 ${m}
+mass 2 ${m}
+variable dt equal 0.1*${h}/${c}       ## 0.0003
+
+group bc    type 1
+group water type 2
+
+set group bc meso/rho ${r}            ## 1000
+set group water meso/rho ${r}         ## 1000
+
+pair_style hybrid/overlay sph/rhosum 1 sph/taitwater
+pair_coeff * * sph/taitwater ${r} ${c} 1.0 ${h}
+pair_coeff 2 2 sph/rhosum ${h}
+
+fix gfix water gravity -9.81 vector 0 1 0  
+
+compute rho_peratom all meso/rho/atom
+compute e_peratom all meso/e/atom
+compute esph all reduce sum c_e_peratom
+compute ke all ke
+compute pe all pe
+compute ke_peratom all ke/atom                                 #
+compute pe_peratom all pe/atom                                 #
+
+variable etot equal c_esph+c_ke+f_gfix
+variable steptime equal step*time
+
+fix dtfix all dt/reset 1 NULL ${dt}  0.0005 units box
+fix integrate_water_fix water meso
+fix integrate_bc_fix bc meso/stationary
+
+thermo 10
+thermo_style custom step time dt v_steptime ke pe etotal fmax c_esph v_etot f_gfix vol density press
+thermo_modify norm no
+
+neigh_modify every 5 delay 0 check no
+
+#variable skin equal 0.3*${h}
+#neighbor ${skin} bin
+#dump dump1_id all custom 100 dump.* id type x y z vx vy vz c_ke_peratom c_pe_peratom mass c_rho_peratom c_e_peratom 
+#dump_modify dump1_id first yes
+
+run 5000
+
+write_restart data.relax

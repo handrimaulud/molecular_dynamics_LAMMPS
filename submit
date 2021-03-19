@@ -1,0 +1,8 @@
+#!/bin/bash
+#SBATCH -p zw
+#SBATCH -n 12
+#SBATCH --job-name=SPH3D
+#SBATCH --mail-type=END
+#SBATCH --mail-user=handrym27@gmail.com
+
+mpirun ./lmp_sph -in in.sph
